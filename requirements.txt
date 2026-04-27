@@ -1,0 +1,11 @@
+# ── Bot pipeline ──────────────────────────────────────────────────────────────
+requests>=2.31.0
+Pillow>=10.0.0
+edge-tts>=6.1.10
+
+# ── Webhook server (desplegar en Railway/Render/Fly.io) ───────────────────────
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+
+# ── Utilidades ────────────────────────────────────────────────────────────────
+python-dotenv>=1.0.0

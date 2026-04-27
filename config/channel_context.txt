@@ -1,0 +1,19 @@
+# Contexto del canal — edita este archivo con la info real de tu canal
+# El bot lo usa como contexto cuando respondes preguntas con /pregunta
+
+Nombre del canal: [TU NOMBRE DE CANAL]
+Temática principal: [Ej: Curiosidades científicas, historia, tecnología...]
+Audiencia objetivo: [Ej: Hispanohablantes 18-35 años]
+Tono del canal: [Ej: Educativo, dinámico, con humor]
+Frecuencia de publicación: 1 Short diario
+Plataforma: YouTube Shorts (videos verticales 9:16, ~50 segundos)
+Idioma: Español
+
+Videos más exitosos:
+- [Describe aquí tus mejores videos cuando los tengas]
+
+Temas a evitar:
+- [Lista temas que no quieres cubrir]
+
+Notas adicionales:
+- [Cualquier otra info relevante sobre tu canal]
