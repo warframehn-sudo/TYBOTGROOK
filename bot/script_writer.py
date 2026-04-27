@@ -68,10 +68,10 @@ class ScriptWriter:
         # Enriquecemos instrucciones muy cortas para dar más contexto a Grok
         prompt = self._build_prompt(instruccion)
 
-        raw = self.client.chat(
+          raw = self.client.chat(
             system     = SYSTEM_PROMPT,
             user       = prompt,
-            model      = "grok-3",
+            model      = "gemini-1.5-flash",
             max_tokens = 1500,
             temperature= 0.85,
         )
