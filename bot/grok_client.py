@@ -20,7 +20,7 @@ class GrokClient:
             "Content-Type" : "application/json",
         }
 
-    def chat(self, user, system="", model="gemini-1.5-flash", max_tokens=2000, temperature=0.8):
+    def chat(self, user, system="", model="gemini-2.0-flash", max_tokens=2000, temperature=0.8):
         url = f"{GEMINI_BASE}/models/{model}:generateContent?key={self.gemini_key}"
         contents = []
         if system:
