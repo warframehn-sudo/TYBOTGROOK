@@ -1,29 +1,29 @@
 """
 grok_client.py — Cliente unificado.
-  - Texto (guion, preguntas): Google Gemini 1.5 Flash (gratuito)
-  - Imagen (miniaturas):      Google Gemini Imagen (gratuito)
+  - Texto (guion, preguntas): OpenRouter (gratuito)
+  - Imagen (miniaturas):      Google Gemini Imagen
   - Video (clips):            Grok Aurora
 """
 
 import os, time, logging, requests, base64
 
 log = logging.getLogger("grok_client")
-GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta"
-GROK_BASE   = "https://api.x.ai/v1"
+GROK_BASE = "https://api.x.ai/v1"
 
 class GrokClient:
     def __init__(self, api_key=None):
-        self.grok_key   = api_key or os.environ.get("GROK_API_KEY", "")
-        self.gemini_key = os.environ.get("GEMINI_API_KEY", "")
+        self.grok_key        = api_key or os.environ.get("GROK_API_KEY", "")
+        self.gemini_key      = os.environ.get("GEMINI_API_KEY", "")
+        self.openrouter_key  = os.environ.get("OPENROUTER_API_KEY", "")
         self.grok_headers = {
             "Authorization": f"Bearer {self.grok_key}",
             "Content-Type" : "application/json",
         }
 
-    def chat(self, user, system="", model="meta-llama/llama-3.1-8b-instruct:free", max_tokens=2000, temperature=0.8):
+    def chat(self, user, system="", model="meta-llama/llama-3.1-8b-instruct", max_tokens=2000, temperature=0.8):
         url = "https://openrouter.ai/api/v1/chat/completions"
         headers = {
-            "Authorization": f"Bearer {os.environ.get('OPENROUTER_API_KEY', '')}",
+            "Authorization": f"Bearer {self.openrouter_key}",
             "Content-Type": "application/json",
         }
         messages = []
@@ -40,8 +40,9 @@ class GrokClient:
         if not r.ok:
             raise RuntimeError(f"OpenRouter error {r.status_code}: {r.text[:400]}")
         return r.json()["choices"][0]["message"]["content"].strip()
+
     def generate_image(self, prompt, size="1280x720", model="imagen-3.0-generate-002"):
-        url = f"{GEMINI_BASE}/models/{model}:predict?key={self.gemini_key}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:predict?key={self.gemini_key}"
         body = {"instances":[{"prompt":prompt}],"parameters":{"sampleCount":1}}
         r = requests.post(url, json=body, timeout=60)
         if not r.ok:
