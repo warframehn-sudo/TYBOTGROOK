@@ -52,7 +52,7 @@ class ScriptWriter:
         raw = self.client.chat(
             system=SYSTEM_PROMPT,
             user=prompt,
-            model="meta-llama/llama-3.1-8b-instruct:free",
+            model="meta-llama/llama-3.1-8b-instruct",
             max_tokens=1500,
             temperature=0.85,
         )
@@ -81,7 +81,7 @@ class ScriptWriter:
             return json.loads(clean)
         except json.JSONDecodeError as e:
             log.error(f"JSON inválido:\n{clean[:500]}")
-            raise ValueError(f"Gemini no devolvió JSON válido: {e}") from e
+            raise ValueError(f"No se obtuvo JSON válido: {e}") from e
 
     def _validate(self, data: dict):
         required = ["title", "topic", "description", "tags", "narration", "segments"]
