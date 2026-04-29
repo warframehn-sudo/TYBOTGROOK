@@ -1,90 +1,72 @@
 """
-video_generator.py — Genera los clips de video con Grok Aurora.
-
-Técnica del último fotograma:
-  Clip 1: solo prompt → genera video, extrae último frame con FFmpeg
-  Clip 2: prompt + primer_frame=último_frame_del_clip_anterior
-  Clip N: idem → continuidad visual garantizada
-  
-Todos los clips se guardan en /tmp/clips/ como archivos .mp4
+video_generator.py — Descarga clips de video de Pexels según el tema
+y los encadena con FFmpeg para hacer un video de 50 segundos.
 """
 
 import os
 import logging
 import subprocess
 import tempfile
+import requests
 from pathlib import Path
 
-from grok_client import GrokClient
-
 log = logging.getLogger("video_generator")
-
 CLIPS_DIR = Path(tempfile.gettempdir()) / "yt_shorts_clips"
+PEXELS_KEY = os.environ.get("PEXELS_API_KEY", "")
 
 
 class VideoGenerator:
     def __init__(self):
-        self.client    = GrokClient()
         self.clips_dir = CLIPS_DIR
         self.clips_dir.mkdir(parents=True, exist_ok=True)
 
     def generate_clips(self, segments: list[dict]) -> list[Path]:
-        """
-        Genera un clip por segmento usando la técnica del último fotograma.
-        Devuelve lista de rutas a los archivos .mp4 en orden.
-        """
-        clips      : list[Path] = []
-        last_frame : bytes | None = None
-
+        clips = []
         for i, seg in enumerate(segments):
-            log.info(f"Generando clip {i+1}/{len(segments)}: {seg['prompt_video'][:60]}")
-            clip_path = self._generate_clip(
-                index       = i + 1,
-                prompt      = seg["prompt_video"],
-                first_frame = last_frame,
-                duration_s  = seg.get("duration_s", 10),
-            )
+            log.info(f"Descargando clip {i+1}/{len(segments)}: {seg['prompt_video'][:60]}")
+            clip_path = self._download_clip(i + 1, seg["prompt_video"])
             clips.append(clip_path)
-            # Extraer último frame para el siguiente clip
-            last_frame = self._extract_last_frame(clip_path)
-            log.info(f"Clip {i+1} listo → {clip_path.name} | frame extraído: {len(last_frame)} bytes")
-
         return clips
 
-    # ─────────────────────────────────────────────────────────────────────────
-    def _generate_clip(
-        self,
-        index      : int,
-        prompt     : str,
-        first_frame: bytes | None,
-        duration_s : int,
-    ) -> Path:
-        """Llama a Grok Aurora y guarda el clip mp4."""
-        video_bytes = self.client.generate_video_clip(
-            prompt      = prompt,
-            first_frame = first_frame,
-            duration_s  = duration_s,
-        )
-        path = self.clips_dir / f"clip_{index:02d}.mp4"
-        path.write_bytes(video_bytes)
-        return path
+    def _download_clip(self, index: int, prompt: str) -> Path:
+        # Extraer palabras clave del prompt para buscar en Pexels
+        keywords = " ".join(prompt.split()[:4])
+        url = "https://api.pexels.com/videos/search"
+        headers = {"Authorization": PEXELS_KEY}
+        params = {
+            "query": keywords,
+            "per_page": 3,
+            "orientation": "portrait",
+            "size": "medium",
+        }
+        r = requests.get(url, headers=headers, params=params, timeout=30)
+        if not r.ok:
+            raise RuntimeError(f"Pexels error {r.status_code}: {r.text[:200]}")
 
-    def _extract_last_frame(self, clip_path: Path) -> bytes:
-        """
-        Usa FFmpeg para extraer el último fotograma del clip como PNG.
-        Comando: ffmpeg -sseof -0.1 -i input.mp4 -frames:v 1 -f image2pipe pipe:1
-        """
-        cmd = [
-            "ffmpeg", "-y",
-            "-sseof", "-0.1",          # 0.1 segundos antes del final
-            "-i", str(clip_path),
-            "-frames:v", "1",
-            "-f", "image2pipe",
-            "-vcodec", "png",
-            "pipe:1",
-        ]
-        result = subprocess.run(cmd, capture_output=True, timeout=30)
-        if result.returncode != 0:
-            err = result.stderr.decode()[-300:]
-            raise RuntimeError(f"FFmpeg error extrayendo frame: {err}")
-        return result.stdout
+        videos = r.json().get("videos", [])
+        if not videos:
+            # Si no hay resultados con esas palabras, buscar algo genérico
+            params["query"] = "nature cinematic"
+            r = requests.get(url, headers=headers, params=params, timeout=30)
+            videos = r.json().get("videos", [])
+
+        # Tomar el primer video y buscar el archivo HD
+        video = videos[0]
+        video_url = None
+        for vf in video["video_files"]:
+            if vf.get("quality") in ("hd", "sd") and vf.get("width", 0) <= 1080:
+                video_url = vf["link"]
+                break
+        if not video_url:
+            video_url = video["video_files"][0]["link"]
+
+        # Descargar el clip
+        out_path = self.clips_dir / f"clip_{index:02d}.mp4"
+        with requests.get(video_url, stream=True, timeout=60) as resp:
+            resp.raise_for_status()
+            with open(out_path, "wb") as f:
+                for chunk in resp.iter_content(chunk_size=8192):
+                    f.write(chunk)
+
+        log.info(f"Clip {index} descargado: {out_path.name}")
+        return out_path
