@@ -20,19 +20,26 @@ class GrokClient:
             "Content-Type" : "application/json",
         }
 
-    def chat(self, user, system="", model="gemini-2.0-flash", max_tokens=2000, temperature=0.8):
-        url = f"{GEMINI_BASE}/models/{model}:generateContent?key={self.gemini_key}"
-        contents = []
+    def chat(self, user, system="", model="meta-llama/llama-3.1-8b-instruct:free", max_tokens=2000, temperature=0.8):
+        url = "https://openrouter.ai/api/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {os.environ.get('OPENROUTER_API_KEY', '')}",
+            "Content-Type": "application/json",
+        }
+        messages = []
         if system:
-            contents.append({"role":"user","parts":[{"text":f"[SISTEMA]\n{system}"}]})
-            contents.append({"role":"model","parts":[{"text":"Entendido."}]})
-        contents.append({"role":"user","parts":[{"text":user}]})
-        body = {"contents":contents,"generationConfig":{"temperature":temperature,"maxOutputTokens":max_tokens}}
-        r = requests.post(url, json=body, timeout=60)
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": user})
+        body = {
+            "model": model,
+            "messages": messages,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+        }
+        r = requests.post(url, json=body, headers=headers, timeout=60)
         if not r.ok:
-            raise RuntimeError(f"Gemini error {r.status_code}: {r.text[:400]}")
-        return r.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
-
+            raise RuntimeError(f"OpenRouter error {r.status_code}: {r.text[:400]}")
+        return r.json()["choices"][0]["message"]["content"].strip()
     def generate_image(self, prompt, size="1280x720", model="imagen-3.0-generate-002"):
         url = f"{GEMINI_BASE}/models/{model}:predict?key={self.gemini_key}"
         body = {"instances":[{"prompt":prompt}],"parameters":{"sampleCount":1}}
