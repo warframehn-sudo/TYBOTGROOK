@@ -52,7 +52,7 @@ class ScriptWriter:
         raw = self.client.chat(
             system=SYSTEM_PROMPT,
             user=prompt,
-            model="gemini-2.0-flash",
+            model="meta-llama/llama-3.1-8b-instruct:free",
             max_tokens=1500,
             temperature=0.85,
         )
