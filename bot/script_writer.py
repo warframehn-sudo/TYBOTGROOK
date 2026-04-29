@@ -12,30 +12,46 @@ log = logging.getLogger("script_writer")
 
 SYSTEM_PROMPT = """
 Eres un guionista experto en YouTube Shorts virales en español.
-Tu tarea es crear un guion de exactamente ~50 segundos (≈120 palabras en narración)
-a partir de la instrucción del creador.
+Crea un guion de ~50 segundos a partir de la instrucción del creador.
 
-REGLAS:
-- La narración total debe ser ≈120 palabras (ni más ni menos).
-- Divide el video en 5 segmentos visuales de ~10 segundos cada uno.
-- Cada segmento tiene un prompt de video para Grok Aurora (en inglés, descriptivo y cinematográfico).
-- El tono debe adaptarse a la instrucción (dramático, educativo, divertido, etc.).
-- El título debe ser llamativo, máx 80 caracteres, apto para Shorts.
-- Los tags deben ser relevantes para YouTube en español.
-
-RESPONDE ÚNICAMENTE con JSON válido, sin markdown, sin explicaciones:
+RESPONDE ÚNICAMENTE con JSON válido, sin markdown, sin texto extra, sin explicaciones.
+El JSON debe tener exactamente esta estructura:
 {
-  "title": "...",
+  "title": "Título llamativo máx 80 chars",
   "topic": "2-4 palabras del tema",
-  "description": "Descripción YouTube max 300 chars. #hashtag1 #hashtag2 #hashtag3",
+  "description": "Descripción YouTube max 300 chars #hashtag1 #hashtag2",
   "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"],
-  "narration": "Texto completo ~120 palabras para narración TTS...",
+  "narration": "Texto completo de narración de aproximadamente 120 palabras para leer en voz alta durante 50 segundos",
   "segments": [
     {
       "index": 1,
       "duration_s": 10,
-      "narration_chunk": "Texto de este segmento...",
-      "prompt_video": "Cinematic prompt in English for this segment..."
+      "narration_chunk": "Texto del segmento 1",
+      "prompt_video": "Cinematic video prompt in English for segment 1"
+    },
+    {
+      "index": 2,
+      "duration_s": 10,
+      "narration_chunk": "Texto del segmento 2",
+      "prompt_video": "Cinematic video prompt in English for segment 2"
+    },
+    {
+      "index": 3,
+      "duration_s": 10,
+      "narration_chunk": "Texto del segmento 3",
+      "prompt_video": "Cinematic video prompt in English for segment 3"
+    },
+    {
+      "index": 4,
+      "duration_s": 10,
+      "narration_chunk": "Texto del segmento 4",
+      "prompt_video": "Cinematic video prompt in English for segment 4"
+    },
+    {
+      "index": 5,
+      "duration_s": 10,
+      "narration_chunk": "Texto del segmento 5",
+      "prompt_video": "Cinematic video prompt in English for segment 5"
     }
   ]
 }
@@ -53,10 +69,11 @@ class ScriptWriter:
             system=SYSTEM_PROMPT,
             user=prompt,
             model="meta-llama/llama-3.1-8b-instruct",
-            max_tokens=1500,
-            temperature=0.85,
+            max_tokens=2000,
+            temperature=0.7,
         )
         data = self._parse_json(raw)
+        data = self._fix_missing_fields(data)
         self._validate(data)
         log.info(f"Guion generado: '{data['title']}' | {len(data['segments'])} segmentos")
         return data
@@ -65,23 +82,55 @@ class ScriptWriter:
         words = len(instruccion.split())
         if words < 8:
             return (
-                f"Instrucción del creador: «{instruccion}»\n\n"
-                "La instrucción es breve. Elige el ángulo más interesante y viral "
-                "para este tema. Define tú el tono y crea el guion completo."
+                f"Crea un guion de YouTube Shorts sobre: «{instruccion}»\n"
+                "Elige el ángulo más interesante y viral. "
+                "Responde SOLO con el JSON, nada más."
             )
         else:
             return (
-                f"Instrucción detallada del creador:\n{instruccion}\n\n"
-                "Respeta todos los detalles, tono y enfoque indicados."
+                f"Crea un guion de YouTube Shorts siguiendo esta instrucción:\n{instruccion}\n"
+                "Respeta el tono y enfoque indicados. "
+                "Responde SOLO con el JSON, nada más."
             )
 
     def _parse_json(self, raw: str) -> dict:
+        # Limpiar markdown si viene
         clean = re.sub(r"```json|```", "", raw).strip()
+        # Intentar extraer JSON con regex si hay texto extra
+        match = re.search(r'\{.*\}', clean, re.DOTALL)
+        if match:
+            clean = match.group(0)
         try:
             return json.loads(clean)
         except json.JSONDecodeError as e:
             log.error(f"JSON inválido:\n{clean[:500]}")
             raise ValueError(f"No se obtuvo JSON válido: {e}") from e
+
+    def _fix_missing_fields(self, data: dict) -> dict:
+        # Si falta narration, construirla uniendo los chunks de segmentos
+        if "narration" not in data and "segments" in data:
+            chunks = [s.get("narration_chunk", "") for s in data["segments"]]
+            data["narration"] = " ".join(chunks)
+
+        # Si falta topic, extraerlo del title
+        if "topic" not in data and "title" in data:
+            data["topic"] = " ".join(data["title"].split()[:3])
+
+        # Si falta description, usar title
+        if "description" not in data:
+            data["description"] = data.get("title", "Video de YouTube Shorts")
+
+        # Si faltan tags, poner genéricos
+        if "tags" not in data:
+            data["tags"] = ["shorts", "viral", "curiosidades"]
+
+        # Asegurar duration_s en cada segmento
+        for seg in data.get("segments", []):
+            seg.setdefault("duration_s", 10)
+            seg.setdefault("prompt_video", "cinematic nature footage")
+            seg.setdefault("narration_chunk", "")
+
+        return data
 
     def _validate(self, data: dict):
         required = ["title", "topic", "description", "tags", "narration", "segments"]
@@ -90,5 +139,3 @@ class ScriptWriter:
                 raise ValueError(f"Falta campo '{key}' en el guion")
         if not data["segments"]:
             raise ValueError("El guion no tiene segmentos")
-        for seg in data["segments"]:
-            seg.setdefault("duration_s", 10)
