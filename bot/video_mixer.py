@@ -41,10 +41,7 @@ class VideoMixer:
         return list_path
 
     def _concat_clips(self, concat_list: Path) -> Path:
-        """Concatena todos los clips manteniendo calidad y uniformizando resolución."""
         out = Path(tempfile.gettempdir()) / "joined.mp4"
-        # Escala cada clip a 1080x1920 y concatena
-        # Usamos filter_complex para uniformidad de FPS y resolución
         cmd = [
             "ffmpeg", "-y",
             "-f", "concat",
@@ -54,11 +51,15 @@ class VideoMixer:
                    f"pad={TARGET_W}:{TARGET_H}:(ow-iw)/2:(oh-ih)/2:black,"
                    f"setsar=1,fps={TARGET_FPS}",
             "-c:v", "libx264",
-            "-preset", "fast",
-            "-crf", "23",
+            "-preset", "ultrafast",
+            "-crf", "28",
             "-pix_fmt", "yuv420p",
-            "-an",           # sin audio por ahora (se agrega en el siguiente paso)
+            "-an",
+            "-max_muxing_queue_size", "9999",
             str(out),
+        ]
+        self._run(cmd, "concat_clips")
+        return out
         ]
         self._run(cmd, "concat_clips")
         return out
