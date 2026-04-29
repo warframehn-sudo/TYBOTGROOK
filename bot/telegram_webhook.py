@@ -96,17 +96,20 @@ async def health():
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 def _parse_command(text: str) -> tuple[str, str]:
-    """
-    Parsea mensajes tipo '/video tema aquí' o '/pregunta consulta'.
-    Devuelve (comando, payload).
-    """
+    # Ignorar mensajes que no empiecen con /
     if not text.startswith("/"):
-        # Mensaje sin slash → tomar como comando /video
         return "video", text
 
-    parts   = text.lstrip("/").split(None, 1)
-    command = parts[0].lower().split("@")[0]  # quitar @bot_name si viene
-    payload = parts[1] if len(parts) > 1 else ""
+    # Limpiar el texto de caracteres especiales de Telegram
+    text = text.strip()
+    parts = text.lstrip("/").split(None, 1)
+    command = parts[0].lower().split("@")[0]
+    payload = parts[1].strip() if len(parts) > 1 else ""
+    
+    # Ignorar si el payload parece un mensaje del propio bot
+    if payload.startswith("⚙️") or payload.startswith("📝") or payload.startswith("❌"):
+        payload = ""
+    
     return command, payload
 
 
